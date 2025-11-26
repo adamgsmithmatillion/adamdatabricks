@@ -1,0 +1,78 @@
+type: "orchestration"
+version: "1.0"
+pipeline:
+  metadata:
+    description: "Simple demo pipeline that creates a table with dummy customer data"
+  components:
+    Start:
+      type: "start"
+      transitions:
+        unconditional:
+          - "Create Demo Table"
+      parameters:
+        componentName: "Start"
+    Create Demo Table:
+      type: "create-table-v2"
+      transitions:
+        success:
+          - "Insert Dummy Data"
+      parameters:
+        componentName: "Create Demo Table"
+        createMethod: "Replace"
+        catalog: "[Environment Default]"
+        schema: "[Environment Default]"
+        table: "demo_customers"
+        tableMetadata:
+          - - "customer_id"
+            - "INTEGER"
+            - ""
+            - ""
+            - "Unique customer identifier"
+          - - "customer_name"
+            - "TEXT"
+            - ""
+            - ""
+            - "Customer full name"
+          - - "email"
+            - "TEXT"
+            - ""
+            - ""
+            - "Customer email address"
+          - - "signup_date"
+            - "DATE"
+            - ""
+            - ""
+            - "Date customer signed up"
+          - - "total_orders"
+            - "INTEGER"
+            - ""
+            - ""
+            - "Total number of orders"
+        tableType: "Managed"
+    Insert Dummy Data:
+      type: "sql-executor"
+      parameters:
+        componentName: "Insert Dummy Data"
+        scriptLocation: "Component"
+        sqlScript: |
+          INSERT INTO demo_customers (customer_id, customer_name, email, signup_date, total_orders)
+          VALUES 
+            (1, 'John Smith', 'john.smith@example.com', '2024-01-15', 5),
+            (2, 'Sarah Johnson', 'sarah.j@example.com', '2024-02-20', 12),
+            (3, 'Michael Chen', 'mchen@example.com', '2024-03-10', 3),
+            (4, 'Emily Davis', 'emily.davis@example.com', '2024-04-05', 8),
+            (5, 'David Rodriguez', 'drodriguez@example.com', '2024-05-12', 15);
+design:
+  components:
+    Start:
+      position:
+        x: 0
+        y: 0
+    Create Demo Table:
+      position:
+        x: 160
+        y: 0
+    Insert Dummy Data:
+      position:
+        x: 320
+        y: 0
