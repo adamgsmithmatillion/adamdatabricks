@@ -1,0 +1,80 @@
+type: "transformation"
+version: "1.0"
+pipeline:
+  metadata:
+    description: "Transform demo customers with segmentation and filtering"
+  components:
+    Load Customers:
+      type: "table-input"
+      parameters:
+        componentName: "Load Customers"
+        catalog: "[Environment Default]"
+        schema: "[Environment Default]"
+        targetTable: "demo_customers"
+        columnNames:
+          - "customer_id"
+          - "customer_name"
+          - "email"
+          - "signup_date"
+          - "total_orders"
+        offsetType: "None"
+    Add Segments:
+      type: "calculator"
+      sources:
+        - "Load Customers"
+      parameters:
+        componentName: "Add Segments"
+        includeInputColumns: "Yes"
+        calculations:
+          - - |
+              CASE 
+                WHEN `total_orders` >= 10 THEN 'VIP'
+                WHEN `total_orders` >= 5 THEN 'Regular'
+                ELSE 'New'
+              END
+            - "customer_segment"
+          - - |
+              LOWER(`email`)
+            - "email_normalized"
+          - - |
+              DATEDIFF(CURRENT_DATE(), `signup_date`)
+            - "days_since_signup"
+    Filter Active:
+      type: "filter"
+      sources:
+        - "Add Segments"
+      parameters:
+        componentName: "Filter Active"
+        filterConditions:
+          - - "total_orders"
+            - "Is"
+            - "Greater than"
+            - "2"
+        combineCondition: "And"
+    Write Output:
+      type: "rewrite-table-dl"
+      sources:
+        - "Filter Active"
+      parameters:
+        componentName: "Write Output"
+        catalog: "[Environment Default]"
+        schema: "[Environment Default]"
+        table: "demo_customers_transformed"
+design:
+  components:
+    Load Customers:
+      position:
+        x: 0
+        y: 0
+    Add Segments:
+      position:
+        x: 160
+        y: 0
+    Filter Active:
+      position:
+        x: 320
+        y: 0
+    Write Output:
+      position:
+        x: 480
+        y: 0
