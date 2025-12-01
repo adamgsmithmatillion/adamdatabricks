@@ -19,7 +19,7 @@ pipeline:
       transitions:
         success:
         - "Batch Loop Iterator"
-      skipped: true
+      skipped: false
       parameters:
         componentName: "Initialize Watermark"
         mode: "Advanced"
