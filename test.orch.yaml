@@ -13,7 +13,7 @@ pipeline:
       type: "run-shared-pipeline"
       parameters:
         componentName: "Run Shared Pipeline"
-        pipelineName:
+        pipelineName: "Adam Databricks#sql-server-incremental-load"
         version: "[Latest]"
         setScalarVariables:
         setGridVariables:

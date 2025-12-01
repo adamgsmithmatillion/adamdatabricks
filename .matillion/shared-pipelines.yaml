@@ -48,7 +48,7 @@ pipelines:
     id: sql-server-load-single-batch
     description: Loads a single batch from SQL Server and updates the watermark.
       Called repeatedly by parent pipeline.
-    enabled: true
+    enabled: false
     parameters:
       last_load_timestamp:
         type: TEXT
