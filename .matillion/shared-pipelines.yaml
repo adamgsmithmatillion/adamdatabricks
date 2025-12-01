@@ -1,0 +1,82 @@
+# This file contains shared pipelines configuration which defines how they appear to consuming users.
+# The configuration is automatically updated when changes are made to shared pipelines in the Designer UI.
+# Please exercise caution when manually editing to avoid conflicts or data loss.
+# For more information please see our documentation.
+
+version: "1.0"
+type: shared-pipelines-config
+pipelines:
+  - pipeline: sql-server-incremental-load/sql-server-incremental-load.orch.yaml
+    displayName: sql-server-incremental-load
+    id: sql-server-incremental-load
+    description: Batched incremental loading from SQL Server to Databricks with
+      persistent watermark. Queries target table for MAX timestamp on each run
+      to resume from last position. Uses child pipeline pattern with loop
+      iterator. Prevents Azure Blob timeout on large datasets (30M+ records).
+    enabled: true
+    parameters:
+      last_load_timestamp:
+        type: TEXT
+        exportAllowed: true
+        description: Watermark timestamp for incremental loading - tracks last
+          successfully loaded record
+        default: 1900-01-01 00:00:00
+      sql_server_table:
+        type: TEXT
+        exportAllowed: true
+        description: Name of the SQL Server source table to load incrementally
+        default: your_source_table
+      timestamp_column:
+        type: TEXT
+        exportAllowed: true
+        description: Column name in source table used for incremental filtering (e.g.,
+          LastModifiedDate, UpdatedAt)
+        default: LastModifiedDate
+      target_table:
+        type: TEXT
+        exportAllowed: true
+        description: Target table name in Databricks where incremental data will be loaded
+        default: staged_incremental_data
+      batch_size:
+        type: NUMERIC
+        exportAllowed: true
+        description: Number of rows to load per batch - keeps each iteration under
+          timeout threshold
+        default: "1000000"
+  - pipeline: sql-server-incremental-load/sql-server-load-single-batch.orch.yaml
+    displayName: sql-server-load-single-batch
+    id: sql-server-load-single-batch
+    description: Loads a single batch from SQL Server and updates the watermark.
+      Called repeatedly by parent pipeline.
+    enabled: true
+    parameters:
+      last_load_timestamp:
+        type: TEXT
+        exportAllowed: true
+        description: Watermark timestamp - tracks last successfully loaded record
+        default: 1900-01-01 00:00:00
+      new_watermark:
+        type: TEXT
+        exportAllowed: true
+        description: Stores latest timestamp from current batch
+        default: ""
+      sql_server_table:
+        type: TEXT
+        exportAllowed: true
+        description: SQL Server source table name
+        default: your_source_table
+      timestamp_column:
+        type: TEXT
+        exportAllowed: true
+        description: Column for incremental filtering
+        default: LastModifiedDate
+      target_table:
+        type: TEXT
+        exportAllowed: true
+        description: Databricks target table name
+        default: staged_incremental_data
+      batch_size:
+        type: NUMERIC
+        exportAllowed: true
+        description: Rows per batch
+        default: "1000000"

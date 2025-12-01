@@ -158,3 +158,30 @@ Child:  Load Batch → Get Watermark → Update Watermark
 ```
 
 **Key advantage**: Watermark updates within each iteration, so each batch loads fresh data (no duplicates).
+
+## Sharing These Pipelines
+
+To make this solution available to other projects as shared pipelines:
+
+### Share Both Pipelines
+
+**Important**: You must share **both pipelines** - parent and child work together.
+
+1. **Share the parent pipeline**:
+   - Open `sql-server-incremental-load.orch.yaml`
+   - Click the share icon or use the share menu
+   - Follow the prompts to publish as a shared pipeline
+
+2. **Share the child pipeline**:
+   - Open `sql-server-load-single-batch.orch.yaml`
+   - Click the share icon or use the share menu
+   - Follow the prompts to publish as a shared pipeline
+
+### For Users Adding These Shared Pipelines
+
+Users must add **both** shared pipelines to their project:
+1. Add the parent pipeline (`sql-server-incremental-load`) from shared pipelines
+2. Add the child pipeline (`sql-server-load-single-batch`) from shared pipelines
+3. Configure connection details and variables (see Configuration Required section above)
+
+**Note**: Sharing the parent pipeline alone will not work - the parent calls the child via Run Orchestration component, and shared pipelines do not automatically bundle their dependencies.
