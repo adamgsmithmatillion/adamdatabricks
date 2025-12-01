@@ -19,6 +19,7 @@ pipeline:
       transitions:
         success:
         - "Batch Loop Iterator"
+      skipped: true
       parameters:
         componentName: "Initialize Watermark"
         mode: "Advanced"
@@ -43,7 +44,7 @@ pipeline:
       type: "run-orchestration"
       parameters:
         componentName: "Load Single Batch"
-        orchestrationJob: "sql-server-load-single-batch.orch.yaml"
+        orchestrationJob: "sql-server-incremental-load/sql-server-load-single-batch.orch.yaml"
         setScalarVariables:
         - - "last_load_timestamp"
           - "${last_load_timestamp}"
