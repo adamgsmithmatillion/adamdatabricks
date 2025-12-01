@@ -1,0 +1,207 @@
+type: "orchestration"
+version: "1.0"
+pipeline:
+  metadata:
+    description: "Loads a single batch from SQL Server and updates the watermark.\
+      \ Called repeatedly by parent pipeline."
+  components:
+    Start:
+      type: "start"
+      transitions:
+        unconditional:
+        - "Load Batch"
+      parameters:
+        componentName: "Start"
+    Load Batch:
+      type: "database-query"
+      transitions:
+        success:
+        - "Get New Watermark"
+      parameters:
+        componentName: "Load Batch"
+        basicAdvancedMode: "Advanced"
+        databaseType: "SQL Server (Microsoft Driver)"
+        connectionUrl: "jdbc:sqlserver://your-sql-server:1433;databaseName=your_database"
+        username: "your_username"
+        password: "your_password_secret_ref"
+        sqlQuery: |
+          SELECT TOP ${batch_size} *
+          FROM ${sql_server_table}
+          WHERE ${timestamp_column} > '${last_load_timestamp}'
+          ORDER BY ${timestamp_column}
+        catalog: "[Environment Default]"
+        database2: "[Environment Default]"
+        table: "${target_table}"
+        stagePlatform1: "Volume"
+        stageVolume: "your_databricks_volume"
+        loadOptions:
+        - - "On"
+          - "Off"
+          - "Off"
+          - ""
+          - "Gzip"
+    Get New Watermark:
+      type: "query-to-scalar"
+      transitions:
+        success:
+        - "Update Watermark Variable"
+      parameters:
+        componentName: "Get New Watermark"
+        mode: "Advanced"
+        query: |
+          SELECT MAX(${timestamp_column}) as max_timestamp
+          FROM ${target_table}
+        scalarVariableMapping:
+        - - "new_watermark"
+          - "max_timestamp"
+    Update Watermark Variable:
+      type: "update-scalar"
+      parameters:
+        componentName: "Update Watermark Variable"
+        scalarsToUpdate:
+        - - "last_load_timestamp"
+          - "${new_watermark}"
+  variables:
+    last_load_timestamp:
+      metadata:
+        type: "TEXT"
+        description: "Watermark timestamp - tracks last successfully loaded record"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "1900-01-01 00:00:00"
+    new_watermark:
+      metadata:
+        type: "TEXT"
+        description: "Stores latest timestamp from current batch"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: ""
+    sql_server_table:
+      metadata:
+        type: "TEXT"
+        description: "SQL Server source table name"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "your_source_table"
+    timestamp_column:
+      metadata:
+        type: "TEXT"
+        description: "Column for incremental filtering"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "LastModifiedDate"
+    target_table:
+      metadata:
+        type: "TEXT"
+        description: "Databricks target table name"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "staged_incremental_data"
+    batch_size:
+      metadata:
+        type: "NUMBER"
+        description: "Rows per batch"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "1000000"
+design:
+  components:
+    Start:
+      position:
+        x: 0
+        "y": 0
+      tempMetlId: null
+    Load Batch:
+      position:
+        x: 160
+        "y": 0
+      tempMetlId: null
+    Get New Watermark:
+      position:
+        x: 320
+        "y": 0
+      tempMetlId: null
+    Update Watermark Variable:
+      position:
+        x: 480
+        "y": 0
+      tempMetlId: null
+  notes:
+    "1":
+      position:
+        x: -20
+        y: -185
+      size:
+        height: 165
+        width: 720
+      theme: "light-blue"
+      content: |
+        ### Child Pipeline: Single Batch Worker
+        
+        Called by parent Loop Iterator. Loads ONE batch and updates watermark. Parent initializes watermark from target table on each run.
+    "2":
+      position:
+        x: 150
+        y: 100
+      size:
+        height: 260
+        width: 420
+      theme: "white"
+      content: |
+        ### SQL Query: TOP with Watermark Filter
+        
+        ```sql
+        SELECT TOP ${batch_size} *
+        WHERE ${timestamp_column} > '${last_load_timestamp}'
+        ORDER BY ${timestamp_column}
+        ```
+        
+        Loads only **new/changed** records since last watermark.
+    "3":
+      position:
+        x: 310
+        y: 380
+      size:
+        height: 245
+        width: 410
+      theme: "white"
+      content: |
+        ### Watermark Update Flow
+        
+        1. Query MAX timestamp from newly loaded batch
+        2. Store in `new_watermark` variable
+        3. Update `last_load_timestamp` for next iteration
+        
+        **Critical:** Updates AFTER each batch. Parent initializes watermark from target table.
+    "4":
+      position:
+        x: -20
+        y: 380
+      size:
+        height: 265
+        width: 310
+      theme: "light-yellow"
+      content: |
+        ### ⚠️ Configure Before Running
+        
+        **In Load Batch component:**
+        - `connectionUrl`: Your SQL Server JDBC URL
+        - `username`: SQL Server username  
+        - `password`: Secret reference name
+        - `stageVolume`: Databricks volume name
+    "5":
+      position:
+        x: 590
+        y: 90
+      size:
+        height: 270
+        width: 340
+      theme: "light-green"
+      content: |
+        ### ✅ Load Options: Append Mode
+        
+        `Recreate Target Table: Off`
+        
+        Each batch **appends** to target table.
+        
+        **First run only:** Change to `On` to create table, then back to `Off`.

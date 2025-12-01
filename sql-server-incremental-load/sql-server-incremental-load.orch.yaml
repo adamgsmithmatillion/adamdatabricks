@@ -1,0 +1,214 @@
+type: "orchestration"
+version: "1.0"
+pipeline:
+  metadata:
+    description: "Batched incremental loading from SQL Server to Databricks with persistent\
+      \ watermark. Queries target table for MAX timestamp on each run to resume from\
+      \ last position. Uses child pipeline pattern with loop iterator. Prevents Azure\
+      \ Blob timeout on large datasets (30M+ records)."
+  components:
+    Start:
+      type: "start"
+      transitions:
+        unconditional:
+        - "Initialize Watermark"
+      parameters:
+        componentName: "Start"
+    Initialize Watermark:
+      type: "query-to-scalar"
+      transitions:
+        success:
+        - "Batch Loop Iterator"
+      parameters:
+        componentName: "Initialize Watermark"
+        mode: "Advanced"
+        query: |
+          SELECT COALESCE(MAX(${timestamp_column}), '1900-01-01 00:00:00') as last_timestamp
+          FROM ${target_table}
+        scalarVariableMapping:
+        - - "last_load_timestamp"
+          - "last_timestamp"
+    Batch Loop Iterator:
+      type: "loop-iterator"
+      iterationTarget: "Load Single Batch"
+      parameters:
+        componentName: "Batch Loop Iterator"
+        concurrency: "Sequential"
+        variableToIterate: "iteration_count"
+        startingValue: "1"
+        incrementValue: "1"
+        endValue: "50"
+        breakOnFailure: "Yes"
+    Load Single Batch:
+      type: "run-orchestration"
+      parameters:
+        componentName: "Load Single Batch"
+        orchestrationJob: "sql-server-load-single-batch.orch.yaml"
+        setScalarVariables:
+        - - "last_load_timestamp"
+          - "${last_load_timestamp}"
+        - - "sql_server_table"
+          - "${sql_server_table}"
+        - - "timestamp_column"
+          - "${timestamp_column}"
+        - - "target_table"
+          - "${target_table}"
+        - - "batch_size"
+          - "${batch_size}"
+  variables:
+    last_load_timestamp:
+      metadata:
+        type: "TEXT"
+        description: "Watermark timestamp for incremental loading - tracks last successfully\
+          \ loaded record"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "1900-01-01 00:00:00"
+    sql_server_table:
+      metadata:
+        type: "TEXT"
+        description: "Name of the SQL Server source table to load incrementally"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "your_source_table"
+    timestamp_column:
+      metadata:
+        type: "TEXT"
+        description: "Column name in source table used for incremental filtering (e.g.,\
+          \ LastModifiedDate, UpdatedAt)"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "LastModifiedDate"
+    target_table:
+      metadata:
+        type: "TEXT"
+        description: "Target table name in Databricks where incremental data will\
+          \ be loaded"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "staged_incremental_data"
+    batch_size:
+      metadata:
+        type: "NUMBER"
+        description: "Number of rows to load per batch - keeps each iteration under\
+          \ timeout threshold"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "1000000"
+    iteration_count:
+      metadata:
+        type: "NUMBER"
+        description: "Loop counter variable used by Loop Iterator to control batching"
+        scope: "SHARED"
+        visibility: "PRIVATE"
+      defaultValue: "0"
+design:
+  components:
+    Start:
+      position:
+        x: 0
+        "y": 0
+      tempMetlId: 1
+    Initialize Watermark:
+      position:
+        x: 160
+        "y": 0
+      tempMetlId: 4
+    Batch Loop Iterator:
+      position:
+        x: 320
+        "y": -20
+      tempMetlId: 2
+    Load Single Batch:
+      position:
+        x: 320
+        "y": -20
+      tempMetlId: 3
+  notes:
+    "1":
+      position:
+        x: -20
+        "y": -240
+      size:
+        height: 205
+        width: 580
+      theme: "light-blue"
+      content: |
+        ### Purpose: Batched Incremental Loading with Persistent Watermark
+
+        Solves Azure Blob timeout issues when loading 30M+ records from SQL Server.
+        Loads data in manageable chunks with watermark tracking after each batch.
+    "2":
+      position:
+        x: 150
+        "y": 100
+      size:
+        height: 250
+        width: 400
+      theme: "white"
+      content: |
+        ### Loop Pattern: Up to 50 Batches
+
+        - Iterates **1 to 50** times sequentially
+        - Each iteration calls child pipeline to load **1M rows**
+        - **Stops early** if no more data matches filter
+        - Watermark updates **after each batch** (not at end)
+    "3":
+      position:
+        x: 570
+        "y": 100
+      size:
+        height: 275
+        width: 380
+      theme: "white"
+      content: |
+        ### Key Variables (PUBLIC)
+
+        - `last_load_timestamp`: **Initialized from target table** at start, updated by child
+        - `batch_size`: Default 1M rows (adjust for timeout)
+        - `sql_server_table`, `timestamp_column`, `target_table`
+
+        **PUBLIC** visibility allows child pipeline to read/write.
+    "4":
+      position:
+        x: 150
+        "y": 395
+      size:
+        height: 205
+        width: 480
+      theme: "light-yellow"
+      content: |
+        ### ⚠️ Important: First Run Setup
+
+        - Update child pipeline connection details (SQL Server URL, credentials)
+        - Configure Databricks `stageVolume` in child pipeline
+        - On **first ever run**: Set "Recreate Target Table" to **On**, then **Off**
+        - **Validation error** on Initialize Watermark is expected before first run
+    "5":
+      position:
+        x: 650
+        "y": 395
+      size:
+        height: 220
+        width: 360
+      theme: "light-green"
+      content: |
+        ### ✅ Best Practice: Tuning
+
+        - **Timeout still occurring?** Reduce `batch_size` to 500K
+        - **Loading too slow?** Increase `batch_size` to 2-5M
+        - **Need more iterations?** Increase `endValue` beyond 50
+    "6":
+      position:
+        x: -320
+        "y": 90
+      size:
+        height: 270
+        width: 410
+      theme: "white"
+      content: |
+        ### Watermark Persistence
+
+        **Initialize Watermark** queries target table for MAX timestamp on each run.
+        - **First run**: Table empty → Returns `1900-01-01` → Loads all data
+        - **Subsequent runs**: Returns actual MAX → Loads only new data
