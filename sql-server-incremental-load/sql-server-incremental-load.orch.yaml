@@ -56,6 +56,14 @@ pipeline:
           - "${target_table}"
         - - "batch_size"
           - "${batch_size}"
+        - - "sql_server_database"
+          - "${sql_server_database}"
+        - - "sql_server_host"
+          - "${sql_server_host}"
+        - - "sql_server_username"
+          - "${sql_server_username}"
+        - - "sql_server_password"
+          - "${sql_server_password}"
   variables:
     last_load_timestamp:
       metadata:
@@ -103,6 +111,41 @@ pipeline:
         scope: "SHARED"
         visibility: "PRIVATE"
       defaultValue: "0"
+    sql_server_database:
+      metadata:
+        type: "TEXT"
+        description: "SQL Server database name"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "your_database"
+    sql_server_host:
+      metadata:
+        type: "TEXT"
+        description: "SQL Server host and port (e.g., server:1433)"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "your-sql-server:1433"
+    sql_server_username:
+      metadata:
+        type: "TEXT"
+        description: "SQL Server username"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "your_username"
+    sql_server_password:
+      metadata:
+        type: "TEXT"
+        description: "SQL Server password secret reference name"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "your_password_secret_ref"
+    databricks_volume:
+      metadata:
+        type: "TEXT"
+        description: "Databricks volume name for staging"
+        scope: "SHARED"
+        visibility: "PUBLIC"
+      defaultValue: "your_databricks_volume"
 design:
   components:
     Start:

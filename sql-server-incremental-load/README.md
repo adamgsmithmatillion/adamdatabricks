@@ -52,8 +52,13 @@ This solution uses a parent-child pipeline pattern to load data incrementally:
 |----------|---------|-------------|
 | `last_load_timestamp` | `1900-01-01 00:00:00` | Watermark value - initialized from target table, updated by child |
 | `batch_size` | `1000000` | Rows per batch - adjust based on timeout threshold |
+| `sql_server_host` | `your-sql-server:1433` | SQL Server hostname and port |
+| `sql_server_database` | `your_database` | SQL Server database name |
+| `sql_server_username` | `your_username` | SQL Server username |
+| `sql_server_password` | `your_password_secret_ref` | SQL Server password secret reference name |
 | `sql_server_table` | `your_source_table` | SQL Server source table name |
 | `timestamp_column` | `LastModifiedDate` | Column used for incremental filtering |
+| `databricks_volume` | `your_databricks_volume` | Databricks volume name for staging |
 | `target_table` | `staged_incremental_data` | Databricks target table name |
 | `iteration_count` | `0` | Loop counter (managed by iterator) |
 
@@ -61,29 +66,35 @@ This solution uses a parent-child pipeline pattern to load data incrementally:
 
 ### Before First Run
 
-**In child pipeline (`sql-server-load-single-batch.orch.yaml`):**
+**Update these PUBLIC variables in the parent pipeline:**
 
-1. **Database Query component ("Load Batch")**:
-   - `connectionUrl`: Your SQL Server JDBC URL (e.g., `jdbc:sqlserver://server:1433;databaseName=db`)
-   - `username`: SQL Server username
-   - `password`: Secret reference name (not actual password)
-   - `stageVolume`: Your Databricks volume name
+**SQL Server Connection:**
+- `sql_server_host`: Your SQL Server hostname and port (e.g., `myserver.database.windows.net:1433`)
+- `sql_server_database`: Database name
+- `sql_server_username`: Username for authentication
+- `sql_server_password`: Secret reference name (not actual password - must be created in Secrets)
+- `sql_server_table`: Source table name to load from
+- `timestamp_column`: Column name used for incremental filtering (e.g., `LastModifiedDate`, `UpdatedAt`)
 
-2. **Load Options**:
-   - Set `Recreate Target Table` to **On** for first run only
-   - Change to **Off** after first run (enables append mode)
+**Databricks Configuration:**
+- `databricks_volume`: Your Databricks volume name for staging data
+- `target_table`: Target table name in Databricks
 
-**In parent pipeline:**
-- Update variable defaults if needed (`sql_server_table`, `timestamp_column`, `target_table`)
+**Batch Settings:**
+- `batch_size`: Rows per batch (default 1M is usually safe)
+
+**Load Options (in child pipeline):**
+- For **first run only**: Set `Recreate Target Table` to **On** in the child pipeline's Database Query component
+- For **all subsequent runs**: Change to **Off** to enable append mode
 
 ### Expected Validation Error
 
 ⚠️ You'll see a validation error on "Initialize Watermark" before first run:
 ```
-TABLE_OR_VIEW_NOT_FOUND: The table or view `staged_incremental_data` cannot be found
+TABLE_OR_VIEW_NOT_FOUND: The table or view cannot be found
 ```
 
-This is **normal and expected** - the table doesn't exist until the first run creates it.
+This is **normal and expected** - the target table doesn't exist until the first run creates it.
 
 ## Usage
 
